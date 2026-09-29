@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201">
+  <fileHeader companyName="Rogerio Menegueli Engineering" productName="Industrial PLC Automation Suite" productVersion="1.0" creationDateTime="2026-09-29T02:50:00"/>
+  <contentHeader name="Industrial_QTA_and_PID_PLC" modificationDateTime="2026-09-29T02:50:00">
+    <coordinateInfo>
+      <fbd><scaling x="1" y="1"/></fbd>
+      <ld><scaling x="1" y="1"/></ld>
+      <sfc><scaling x="1" y="1"/></sfc>
+    </coordinateInfo>
+  </contentHeader>
+  <types>
+    <dataTypes/>
+    <pous>
+      <pou name="FB_QTA_Controller" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="bAutoMode"><type><BOOL/></type></variable>
+            <variable name="bEmergencyStop"><type><BOOL/></type></variable>
+            <variable name="rUtilityVoltage_V"><type><REAL/></type></variable>
+            <variable name="rGenVoltage_V"><type><REAL/></type></variable>
+          </inputVars>
+          <outputVars>
+            <variable name="iState"><type><INT/></type></variable>
+            <variable name="bCmdCloseMains_52R"><type><BOOL/></type></variable>
+            <variable name="bCmdCloseGen_52G"><type><BOOL/></type></variable>
+          </outputVars>
+        </interface>
+        <body>
+          <ST><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">(* Full IEC 61131-3 implementation in src/iec61131/FB_QTA_Controller.st *)</xhtml:p></ST>
+        </body>
+      </pou>
+    </pous>
+  </types>
+  <instances><configurations/></instances>
+</project>
