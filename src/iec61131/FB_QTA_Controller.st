@@ -1,36 +1,30 @@
-(* ============================================================================
-   PROJECT: 250 kVA Standby Diesel Generator & Automatic Transfer Switch (QTA)
-   STANDARD: IEC 61131-3 Structured Text (CODESYS / TIA Portal / OpenPLC)
-   AUTHOR: Rogerio Eduardo Moreira Menegueli
-   DESCRIPTION:
-     Complete state-machine & interlocking logic for Utility (52-R) vs.
-     Standby Generator (52-G) transfer with ANSI 27/59 voltage monitoring,
-     crank retry sequence, warm-up, retransfer delay, and engine cooldown.
-   ============================================================================ *)
+(* Conceptual IEC 61131-3 state machine for an open-transition QTA.
+   This source is not safety-rated or approved for direct plant use.
+   State IDs match the simulation model and drawing P12-07. *)
 
 FUNCTION_BLOCK FB_QTA_Controller
 VAR_INPUT
-    bAutoMode           : BOOL := TRUE;     (* Selector Switch in AUTO *)
-    bEmergencyStop      : BOOL := FALSE;    (* Emergency Stop Button NC inverted *)
-    rUtilityVoltage_V   : REAL := 380.0;    (* Line-to-Line Utility Voltage [V] *)
-    rUtilityFreq_Hz     : REAL := 60.0;     (* Utility Frequency [Hz] *)
-    rGenVoltage_V       : REAL := 0.0;      (* Generator Voltage [V] *)
-    rGenFreq_Hz         : REAL := 0.0;      (* Generator Frequency [Hz] *)
-    bOilPressureOK      : BOOL := TRUE;     (* Low Oil Pressure Switch *)
-    bCoolantTempOK      : BOOL := TRUE;     (* High Coolant Temp Switch *)
-    bFbkBreakerMains    : BOOL := FALSE;    (* Auxiliary Contact 52-R *)
-    bFbkBreakerGen      : BOOL := FALSE;    (* Auxiliary Contact 52-G *)
-    rDt_s               : REAL := 0.1;      (* Scan Cycle Time [s] *)
+    bAutoMode           : BOOL := TRUE;
+    bEmergencyStop      : BOOL := FALSE;
+    rUtilityVoltage_V   : REAL := 380.0;
+    rUtilityFreq_Hz     : REAL := 60.0;
+    rGenVoltage_V       : REAL := 0.0;
+    rGenFreq_Hz         : REAL := 0.0;
+    bOilPressureOK      : BOOL := TRUE;
+    bCoolantTempOK      : BOOL := TRUE;
+    bFbkBreakerMains    : BOOL := FALSE;
+    bFbkBreakerGen      : BOOL := FALSE;
+    rDt_s               : REAL := 0.1;
 END_VAR
 
 VAR_OUTPUT
-    iState              : INT  := 0;        (* 0:Standby, 1:MainsFailDelay, 2:Cranking, 3:WarmUp, 4:OnGenerator, 5:RetransferDelay, 6:Cooldown, 99:Fault *)
-    bCmdFuelSolenoid    : BOOL := FALSE;    (* K1 Fuel Solenoid Output *)
-    bCmdStarterMotor    : BOOL := FALSE;    (* K2 Starter Cranking Output *)
-    bCmdCloseMains_52R  : BOOL := FALSE;    (* Close Utility Contactor/ACB 52-R *)
-    bCmdCloseGen_52G    : BOOL := FALSE;    (* Close Generator Contactor/ACB 52-G *)
-    bAlarmGeneral       : BOOL := FALSE;    (* Horn / SCADA Alarm Bit *)
-    iCrankAttempts      : INT  := 0;        (* Number of Start Attempts (Max 3) *)
+    iState              : INT := 0;  (* 0 standby, 1 utility delay, 2 crank, 3 rest, 4 stabilize, 5 transfer to GMG, 6 GMG load, 7 utility return delay, 8 transfer to utility, 9 cooldown, 99 fault *)
+    bCmdFuelSolenoid    : BOOL := FALSE;
+    bCmdStarterMotor    : BOOL := FALSE;
+    bCmdCloseMains_52R  : BOOL := FALSE;
+    bCmdCloseGen_52G    : BOOL := FALSE;
+    bAlarmGeneral       : BOOL := FALSE;
+    iCrankAttempts      : INT := 0;
 END_VAR
 
 VAR
@@ -39,116 +33,221 @@ VAR
     bGenHealthy         : BOOL := FALSE;
 END_VAR
 
-(* 1. ANSI 27/59 Utility & Generator Supervision *)
-bUtilityHealthy := (rUtilityVoltage_V >= 342.0) AND (rUtilityVoltage_V <= 418.0) AND (rUtilityFreq_Hz >= 57.5) AND (rUtilityFreq_Hz <= 62.5);
-bGenHealthy     := (rGenVoltage_V >= 350.0) AND (rGenVoltage_V <= 410.0) AND (rGenFreq_Hz >= 58.0) AND (rGenFreq_Hz <= 62.0);
+bUtilityHealthy := (rUtilityVoltage_V >= 323.0) AND (rUtilityVoltage_V <= 418.0)
+                   AND (rUtilityFreq_Hz >= 57.0) AND (rUtilityFreq_Hz <= 63.0);
+bGenHealthy := (rGenVoltage_V >= 372.4) AND (rGenVoltage_V <= 387.6)
+               AND (rGenFreq_Hz >= 59.4) AND (rGenFreq_Hz <= 60.6);
 
-(* 2. Critical Safety Interlock *)
-IF bEmergencyStop OR NOT bOilPressureOK OR NOT bCoolantTempOK THEN
-    iState             := 99;
-    bCmdFuelSolenoid   := FALSE;
-    bCmdStarterMotor   := FALSE;
+IF rDt_s <= 0.0 THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+
+IF bEmergencyStop OR (bGenHealthy AND (NOT bOilPressureOK OR NOT bCoolantTempOK))
+   OR (bFbkBreakerMains AND bFbkBreakerGen) THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+
+IF iState = 99 THEN
+    bCmdFuelSolenoid := FALSE;
+    bCmdStarterMotor := FALSE;
     bCmdCloseMains_52R := FALSE;
-    bCmdCloseGen_52G   := FALSE;
-    bAlarmGeneral      := TRUE;
+    bCmdCloseGen_52G := FALSE;
+    bAlarmGeneral := TRUE;
     RETURN;
 END_IF;
 
-(* 3. Main ATS State Machine *)
 CASE iState OF
-    0: (* STANDBY ON UTILITY *)
-        bCmdFuelSolenoid   := FALSE;
-        bCmdStarterMotor   := FALSE;
-        bCmdCloseGen_52G   := FALSE;
+    0: (* Utility standby *)
+        bCmdFuelSolenoid := FALSE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseGen_52G := FALSE;
         bCmdCloseMains_52R := bUtilityHealthy AND NOT bFbkBreakerGen;
+        rTimer_s := 0.0;
         IF bAutoMode AND NOT bUtilityHealthy THEN
-            rTimer_s := 0.0;
-            iState   := 1;
+            iState := 1;
         END_IF;
 
-    1: (* MAINS FAILURE CONFIRMATION DELAY (3.0 s) *)
+    1: (* Confirm utility failure for 3 s *)
         bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := FALSE;
+        bCmdStarterMotor := FALSE;
         rTimer_s := rTimer_s + rDt_s;
         IF bUtilityHealthy THEN
+            rTimer_s := 0.0;
             iState := 0;
         ELSIF rTimer_s >= 3.0 THEN
             iCrankAttempts := 1;
-            rTimer_s       := 0.0;
-            iState         := 2;
+            rTimer_s := 0.0;
+            iState := 2;
         END_IF;
 
-    2: (* ENGINE CRANKING (Max 3 attempts of 8s crank) *)
+    2: (* Crank for up to 5 s *)
         bCmdCloseMains_52R := FALSE;
-        bCmdCloseGen_52G   := FALSE;
-        bCmdFuelSolenoid   := TRUE;
-        bCmdStarterMotor   := TRUE;
-        rTimer_s           := rTimer_s + rDt_s;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := TRUE;
+        rTimer_s := rTimer_s + rDt_s;
         IF bGenHealthy THEN
             bCmdStarterMotor := FALSE;
-            rTimer_s         := 0.0;
-            iState           := 3;
-        ELSIF rTimer_s >= 8.0 THEN
+            rTimer_s := 0.0;
+            iState := 4;
+        ELSIF rTimer_s >= 5.0 THEN
             bCmdStarterMotor := FALSE;
+            rTimer_s := 0.0;
+            iState := 3;
+        END_IF;
+
+    3: (* 5 s rest between attempts *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF bGenHealthy THEN
+            rTimer_s := 0.0;
+            iState := 4;
+        ELSIF rTimer_s >= 5.0 THEN
             IF iCrankAttempts >= 3 THEN
                 bCmdFuelSolenoid := FALSE;
-                bAlarmGeneral    := TRUE;
-                iState           := 99;
+                bAlarmGeneral := TRUE;
+                iState := 99;
             ELSE
                 iCrankAttempts := iCrankAttempts + 1;
-                rTimer_s       := 0.0;
+                rTimer_s := 0.0;
+                iState := 2;
             END_IF;
         END_IF;
 
-    3: (* GENERATOR WARM-UP & VOLTAGE STABILIZATION (5.0 s) *)
-        bCmdFuelSolenoid   := TRUE;
-        bCmdStarterMotor   := FALSE;
+    4: (* 5 s generator stabilization *)
         bCmdCloseMains_52R := FALSE;
-        rTimer_s           := rTimer_s + rDt_s;
-        IF NOT bGenHealthy THEN
-            iState := 2;
-        ELSIF rTimer_s >= 5.0 AND NOT bFbkBreakerMains THEN
-            bCmdCloseGen_52G := TRUE;
-            rTimer_s         := 0.0;
-            iState           := 4;
-        END_IF;
-
-    4: (* LOAD SUPPLIED BY GENERATOR (52-G CLOSED) *)
-        bCmdFuelSolenoid   := TRUE;
-        bCmdCloseMains_52R := FALSE;
-        bCmdCloseGen_52G   := NOT bFbkBreakerMains;
-        IF bUtilityHealthy THEN
-            rTimer_s := 0.0;
-            iState   := 5;
-        END_IF;
-
-    5: (* UTILITY RETURN RETRANSFER DELAY (15.0 s) *)
+        bCmdCloseGen_52G := FALSE;
         bCmdFuelSolenoid := TRUE;
-        rTimer_s         := rTimer_s + rDt_s;
-        IF NOT bUtilityHealthy THEN
-            iState := 4;
-        ELSIF rTimer_s >= 15.0 THEN
-            bCmdCloseGen_52G   := FALSE;
-            bCmdCloseMains_52R := NOT bFbkBreakerGen;
-            rTimer_s           := 0.0;
-            iState             := 6;
+        bCmdStarterMotor := FALSE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF NOT bGenHealthy THEN
+            IF iCrankAttempts >= 3 THEN
+                bCmdFuelSolenoid := FALSE;
+                bAlarmGeneral := TRUE;
+                iState := 99;
+            ELSE
+                iCrankAttempts := iCrankAttempts + 1;
+                rTimer_s := 0.0;
+                iState := 2;
+            END_IF;
+        ELSIF rTimer_s >= 5.0 THEN
+            rTimer_s := 0.0;
+            iState := 5;
         END_IF;
 
-    6: (* ENGINE UNLOADED COOLDOWN RUN (30.0 s) *)
-        bCmdCloseGen_52G   := FALSE;
-        bCmdCloseMains_52R := bUtilityHealthy AND NOT bFbkBreakerGen;
-        bCmdFuelSolenoid   := TRUE;
-        rTimer_s           := rTimer_s + rDt_s;
-        IF NOT bUtilityHealthy THEN
-            iState := 3;
-        ELSIF rTimer_s >= 30.0 THEN
-            bCmdFuelSolenoid := FALSE;
-            rTimer_s         := 0.0;
-            iState           := 0;
+    5: (* Open 52-R, prove open, then 1.5 s dead time *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        IF NOT bGenHealthy THEN
+            bAlarmGeneral := TRUE;
+            iState := 99;
+        ELSIF bFbkBreakerMains THEN
+            rTimer_s := 0.0;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s >= 1.5 THEN
+                bCmdCloseGen_52G := TRUE;
+                rTimer_s := 0.0;
+                iState := 6;
+            END_IF;
         END_IF;
+
+    6: (* Generator on load *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := NOT bFbkBreakerMains;
+        IF NOT bGenHealthy THEN
+            bAlarmGeneral := TRUE;
+            iState := 99;
+        ELSIF bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            iState := 7;
+        END_IF;
+
+    7: (* Utility must remain healthy for 120 s *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := NOT bFbkBreakerMains;
+        rTimer_s := rTimer_s + rDt_s;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            iState := 6;
+        ELSIF rTimer_s >= 120.0 THEN
+            bCmdCloseGen_52G := FALSE;
+            rTimer_s := 0.0;
+            iState := 8;
+        END_IF;
+
+    8: (* Open 52-G, prove open, then 1.5 s dead time *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            IF bGenHealthy THEN
+                iState := 5;
+            ELSE
+                iState := 99;
+                bAlarmGeneral := TRUE;
+            END_IF;
+        ELSIF bFbkBreakerGen THEN
+            rTimer_s := 0.0;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s >= 1.5 THEN
+                bCmdCloseMains_52R := TRUE;
+                rTimer_s := 0.0;
+                iState := 9;
+            END_IF;
+        END_IF;
+
+    9: (* 180 s no-load cool-down *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdCloseMains_52R := bUtilityHealthy AND NOT bFbkBreakerGen;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            IF bGenHealthy THEN
+                iState := 5;
+            ELSE
+                iState := 1;
+            END_IF;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s >= 180.0 THEN
+                bCmdFuelSolenoid := FALSE;
+                iCrankAttempts := 0;
+                rTimer_s := 0.0;
+                iState := 0;
+            END_IF;
+        END_IF;
+
+ELSE
+    iState := 99;
+    bAlarmGeneral := TRUE;
 END_CASE;
 
-(* 4. Hard Electrical Interlock Assertion: Never assert both 52-R and 52-G *)
 IF bCmdCloseMains_52R AND bCmdCloseGen_52G THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+IF bCmdCloseMains_52R AND bFbkBreakerGen THEN
+    bCmdCloseMains_52R := FALSE;
+END_IF;
+IF bCmdCloseGen_52G AND bFbkBreakerMains THEN
     bCmdCloseGen_52G := FALSE;
 END_IF;
 END_FUNCTION_BLOCK

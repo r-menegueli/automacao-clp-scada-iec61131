@@ -4,8 +4,9 @@
    AUTHOR: Rogerio Eduardo Moreira Menegueli
    DESCRIPTION:
      4-20 mA analog transmitter scaling (LIT-101, FIT-102) with broken-wire
-     detection (< 3.6 mA) and discrete velocity/positional PID controller with
-     anti-windup and high-high/low-low safety interlocks.
+     detection (< 3.6 mA or > 21.0 mA) and a discrete PID with output clamping.
+     Only LSHH is an input to this block; low-level action belongs to the
+     documented source/suction process and is not inferred from tank LT-101.
    ============================================================================ *)
 
 FUNCTION_BLOCK FB_Level_PID_Controller
@@ -18,7 +19,6 @@ VAR_INPUT
     rKd                 : REAL := 0.15;     (* Derivative Gain [s] *)
     rDt_s               : REAL := 0.1;      (* Sample Time [s] *)
     bLevelSwitchHH      : BOOL := FALSE;    (* LSHH-101 High-High Hardwired Switch *)
-    bLevelSwitchLL      : BOOL := FALSE;    (* LSLL-101 Low-Low Dry-Run Switch *)
 END_VAR
 
 VAR_OUTPUT
@@ -52,7 +52,7 @@ rLevel_Pct := ((rRawCurrent_mA - 4.0) / 16.0) * 100.0;
 IF rLevel_Pct < 0.0 THEN rLevel_Pct := 0.0; END_IF;
 IF rLevel_Pct > 100.0 THEN rLevel_Pct := 100.0; END_IF;
 
-(* 2. Safety Interlocks (Overflow LSHH or Dry-Run LSLL) *)
+(* 2. Process permissives. LSHH is the high-level stop input. *)
 IF NOT bEnable OR bLevelSwitchHH OR (rLevel_Pct >= 95.0) THEN
     bPumpRunEnable  := FALSE;
     rVfdCommand_Pct := 0.0;

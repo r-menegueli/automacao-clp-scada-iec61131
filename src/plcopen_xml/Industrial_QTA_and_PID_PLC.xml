@@ -1,35 +1,665 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://www.plcopen.org/xml/tc6_0201">
-  <fileHeader companyName="Rogerio Menegueli Engineering" productName="Industrial PLC Automation Suite" productVersion="1.0" creationDateTime="2026-09-29T02:50:00"/>
-  <contentHeader name="Industrial_QTA_and_PID_PLC" modificationDateTime="2026-09-29T02:50:00">
+<?xml version='1.0' encoding='utf-8'?>
+<project xmlns="http://www.plcopen.org/xml/tc6_0201" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  <fileHeader companyName="Rogério Eduardo Moreira Menegueli" productName="Academic Industrial Automation Examples" productVersion="1.1" creationDateTime="2026-11-05T00:00:00" />
+  <contentHeader name="Industrial_QTA_and_PID_PLC">
     <coordinateInfo>
-      <fbd><scaling x="1" y="1"/></fbd>
-      <ld><scaling x="1" y="1"/></ld>
-      <sfc><scaling x="1" y="1"/></sfc>
+      <fbd>
+        <scaling x="1" y="1" />
+      </fbd>
+      <ld>
+        <scaling x="1" y="1" />
+      </ld>
+      <sfc>
+        <scaling x="1" y="1" />
+      </sfc>
     </coordinateInfo>
   </contentHeader>
   <types>
-    <dataTypes/>
+    <dataTypes />
     <pous>
       <pou name="FB_QTA_Controller" pouType="functionBlock">
         <interface>
           <inputVars>
-            <variable name="bAutoMode"><type><BOOL/></type></variable>
-            <variable name="bEmergencyStop"><type><BOOL/></type></variable>
-            <variable name="rUtilityVoltage_V"><type><REAL/></type></variable>
-            <variable name="rGenVoltage_V"><type><REAL/></type></variable>
+            <variable name="bAutoMode">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE" />
+              </initialValue>
+            </variable>
+            <variable name="bEmergencyStop">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="rUtilityVoltage_V">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="380.0" />
+              </initialValue>
+            </variable>
+            <variable name="rUtilityFreq_Hz">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="60.0" />
+              </initialValue>
+            </variable>
+            <variable name="rGenVoltage_V">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="rGenFreq_Hz">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="bOilPressureOK">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE" />
+              </initialValue>
+            </variable>
+            <variable name="bCoolantTempOK">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE" />
+              </initialValue>
+            </variable>
+            <variable name="bFbkBreakerMains">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="bFbkBreakerGen">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="rDt_s">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.1" />
+              </initialValue>
+            </variable>
           </inputVars>
           <outputVars>
-            <variable name="iState"><type><INT/></type></variable>
-            <variable name="bCmdCloseMains_52R"><type><BOOL/></type></variable>
-            <variable name="bCmdCloseGen_52G"><type><BOOL/></type></variable>
+            <variable name="iState">
+              <type>
+                <INT />
+              </type>
+              <initialValue>
+                <simpleValue value="0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>0 standby, 1 utility delay, 2 crank, 3 rest, 4 stabilize, 5 transfer to GMG, 6 GMG load, 7 utility return delay, 8 transfer to utility, 9 cooldown, 99 fault</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="bCmdFuelSolenoid">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="bCmdStarterMotor">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="bCmdCloseMains_52R">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="bCmdCloseGen_52G">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="bAlarmGeneral">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+            <variable name="iCrankAttempts">
+              <type>
+                <INT />
+              </type>
+              <initialValue>
+                <simpleValue value="0" />
+              </initialValue>
+            </variable>
           </outputVars>
+          <localVars>
+            <variable name="rTimer_s">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="bUtilityHealthy">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE" />
+              </initialValue>
+            </variable>
+            <variable name="bGenHealthy">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+            </variable>
+          </localVars>
         </interface>
         <body>
-          <ST><xhtml:p xmlns:xhtml="http://www.w3.org/1999/xhtml">(* Full IEC 61131-3 implementation in src/iec61131/FB_QTA_Controller.st *)</xhtml:p></ST>
+          <ST>
+            <xhtml:p>bUtilityHealthy := (rUtilityVoltage_V &gt;= 323.0) AND (rUtilityVoltage_V &lt;= 418.0)
+                   AND (rUtilityFreq_Hz &gt;= 57.0) AND (rUtilityFreq_Hz &lt;= 63.0);
+bGenHealthy := (rGenVoltage_V &gt;= 372.4) AND (rGenVoltage_V &lt;= 387.6)
+               AND (rGenFreq_Hz &gt;= 59.4) AND (rGenFreq_Hz &lt;= 60.6);
+
+IF rDt_s &lt;= 0.0 THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+
+IF bEmergencyStop OR (bGenHealthy AND (NOT bOilPressureOK OR NOT bCoolantTempOK))
+   OR (bFbkBreakerMains AND bFbkBreakerGen) THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+
+IF iState = 99 THEN
+    bCmdFuelSolenoid := FALSE;
+    bCmdStarterMotor := FALSE;
+    bCmdCloseMains_52R := FALSE;
+    bCmdCloseGen_52G := FALSE;
+    bAlarmGeneral := TRUE;
+    RETURN;
+END_IF;
+
+CASE iState OF
+    0: (* Utility standby *)
+        bCmdFuelSolenoid := FALSE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdCloseMains_52R := bUtilityHealthy AND NOT bFbkBreakerGen;
+        rTimer_s := 0.0;
+        IF bAutoMode AND NOT bUtilityHealthy THEN
+            iState := 1;
+        END_IF;
+
+    1: (* Confirm utility failure for 3 s *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := FALSE;
+        bCmdStarterMotor := FALSE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            iState := 0;
+        ELSIF rTimer_s &gt;= 3.0 THEN
+            iCrankAttempts := 1;
+            rTimer_s := 0.0;
+            iState := 2;
+        END_IF;
+
+    2: (* Crank for up to 5 s *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := TRUE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF bGenHealthy THEN
+            bCmdStarterMotor := FALSE;
+            rTimer_s := 0.0;
+            iState := 4;
+        ELSIF rTimer_s &gt;= 5.0 THEN
+            bCmdStarterMotor := FALSE;
+            rTimer_s := 0.0;
+            iState := 3;
+        END_IF;
+
+    3: (* 5 s rest between attempts *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF bGenHealthy THEN
+            rTimer_s := 0.0;
+            iState := 4;
+        ELSIF rTimer_s &gt;= 5.0 THEN
+            IF iCrankAttempts &gt;= 3 THEN
+                bCmdFuelSolenoid := FALSE;
+                bAlarmGeneral := TRUE;
+                iState := 99;
+            ELSE
+                iCrankAttempts := iCrankAttempts + 1;
+                rTimer_s := 0.0;
+                iState := 2;
+            END_IF;
+        END_IF;
+
+    4: (* 5 s generator stabilization *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        rTimer_s := rTimer_s + rDt_s;
+        IF NOT bGenHealthy THEN
+            IF iCrankAttempts &gt;= 3 THEN
+                bCmdFuelSolenoid := FALSE;
+                bAlarmGeneral := TRUE;
+                iState := 99;
+            ELSE
+                iCrankAttempts := iCrankAttempts + 1;
+                rTimer_s := 0.0;
+                iState := 2;
+            END_IF;
+        ELSIF rTimer_s &gt;= 5.0 THEN
+            rTimer_s := 0.0;
+            iState := 5;
+        END_IF;
+
+    5: (* Open 52-R, prove open, then 1.5 s dead time *)
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        IF NOT bGenHealthy THEN
+            bAlarmGeneral := TRUE;
+            iState := 99;
+        ELSIF bFbkBreakerMains THEN
+            rTimer_s := 0.0;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s &gt;= 1.5 THEN
+                bCmdCloseGen_52G := TRUE;
+                rTimer_s := 0.0;
+                iState := 6;
+            END_IF;
+        END_IF;
+
+    6: (* Generator on load *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := NOT bFbkBreakerMains;
+        IF NOT bGenHealthy THEN
+            bAlarmGeneral := TRUE;
+            iState := 99;
+        ELSIF bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            iState := 7;
+        END_IF;
+
+    7: (* Utility must remain healthy for 120 s *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := NOT bFbkBreakerMains;
+        rTimer_s := rTimer_s + rDt_s;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            iState := 6;
+        ELSIF rTimer_s &gt;= 120.0 THEN
+            bCmdCloseGen_52G := FALSE;
+            rTimer_s := 0.0;
+            iState := 8;
+        END_IF;
+
+    8: (* Open 52-G, prove open, then 1.5 s dead time *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseMains_52R := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            IF bGenHealthy THEN
+                iState := 5;
+            ELSE
+                iState := 99;
+                bAlarmGeneral := TRUE;
+            END_IF;
+        ELSIF bFbkBreakerGen THEN
+            rTimer_s := 0.0;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s &gt;= 1.5 THEN
+                bCmdCloseMains_52R := TRUE;
+                rTimer_s := 0.0;
+                iState := 9;
+            END_IF;
+        END_IF;
+
+    9: (* 180 s no-load cool-down *)
+        bCmdFuelSolenoid := TRUE;
+        bCmdStarterMotor := FALSE;
+        bCmdCloseGen_52G := FALSE;
+        bCmdCloseMains_52R := bUtilityHealthy AND NOT bFbkBreakerGen;
+        IF NOT bUtilityHealthy THEN
+            rTimer_s := 0.0;
+            IF bGenHealthy THEN
+                iState := 5;
+            ELSE
+                iState := 1;
+            END_IF;
+        ELSE
+            rTimer_s := rTimer_s + rDt_s;
+            IF rTimer_s &gt;= 180.0 THEN
+                bCmdFuelSolenoid := FALSE;
+                iCrankAttempts := 0;
+                rTimer_s := 0.0;
+                iState := 0;
+            END_IF;
+        END_IF;
+
+ELSE
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_CASE;
+
+IF bCmdCloseMains_52R AND bCmdCloseGen_52G THEN
+    iState := 99;
+    bAlarmGeneral := TRUE;
+END_IF;
+IF bCmdCloseMains_52R AND bFbkBreakerGen THEN
+    bCmdCloseMains_52R := FALSE;
+END_IF;
+IF bCmdCloseGen_52G AND bFbkBreakerMains THEN
+    bCmdCloseGen_52G := FALSE;
+END_IF;</xhtml:p>
+          </ST>
+        </body>
+      </pou>
+      <pou name="FB_Level_PID_Controller" pouType="functionBlock">
+        <interface>
+          <inputVars>
+            <variable name="bEnable">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="TRUE" />
+              </initialValue>
+            </variable>
+            <variable name="rRawCurrent_mA">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="12.0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>4.0 to 20.0 mA from LIT-101</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rSetpoint_Pct">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="65.0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Desired Tank Level [0..100%]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rKp">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="2.4" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Proportional Gain</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rKi">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.35" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Integral Gain [1/s]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rKd">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.15" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Derivative Gain [s]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rDt_s">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.1" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Sample Time [s]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="bLevelSwitchHH">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>LSHH-101 High-High Hardwired Switch</xhtml:p>
+              </documentation>
+            </variable>
+          </inputVars>
+          <outputVars>
+            <variable name="rLevel_Pct">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Scaled Tank Level [0..100%]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rVfdCommand_Pct">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Pump VFD Speed Command [0..100%]</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="rAnalogOut_mA">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="4.0" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>4-20 mA Output to VFD AI1</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="bFaultWireBreak">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>NAMUR NE43 Fault (&lt; 3.6 mA or &gt; 21.0 mA)</xhtml:p>
+              </documentation>
+            </variable>
+            <variable name="bPumpRunEnable">
+              <type>
+                <BOOL />
+              </type>
+              <initialValue>
+                <simpleValue value="FALSE" />
+              </initialValue>
+              <documentation>
+                <xhtml:p>Contactor / VFD Run Permissive</xhtml:p>
+              </documentation>
+            </variable>
+          </outputVars>
+          <localVars>
+            <variable name="rError">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="rPrevError">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="rIntegral">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="rDerivative">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+            <variable name="rUnsatOutput">
+              <type>
+                <REAL />
+              </type>
+              <initialValue>
+                <simpleValue value="0.0" />
+              </initialValue>
+            </variable>
+          </localVars>
+        </interface>
+        <body>
+          <ST>
+            <xhtml:p>(* 1. NAMUR NE43 4-20 mA Transmitter Diagnostics &amp; Scaling *)
+IF (rRawCurrent_mA &lt; 3.6) OR (rRawCurrent_mA &gt; 21.0) THEN
+    bFaultWireBreak := TRUE;
+    bPumpRunEnable  := FALSE;
+    rVfdCommand_Pct := 0.0;
+    rAnalogOut_mA   := 4.0;
+    RETURN;
+ELSE
+    bFaultWireBreak := FALSE;
+END_IF;
+
+rLevel_Pct := ((rRawCurrent_mA - 4.0) / 16.0) * 100.0;
+IF rLevel_Pct &lt; 0.0 THEN rLevel_Pct := 0.0; END_IF;
+IF rLevel_Pct &gt; 100.0 THEN rLevel_Pct := 100.0; END_IF;
+
+(* 2. Process permissives. LSHH is the high-level stop input. *)
+IF NOT bEnable OR bLevelSwitchHH OR (rLevel_Pct &gt;= 95.0) THEN
+    bPumpRunEnable  := FALSE;
+    rVfdCommand_Pct := 0.0;
+    rAnalogOut_mA   := 4.0;
+    rIntegral       := 0.0;
+    RETURN;
+END_IF;
+
+(* 3. Discrete PID with Clamping Anti-Windup *)
+rError      := rSetpoint_Pct - rLevel_Pct;
+rIntegral   := rIntegral + (rError * rKi * rDt_s);
+IF rIntegral &gt; 100.0 THEN rIntegral := 100.0; END_IF;
+IF rIntegral &lt; 0.0   THEN rIntegral := 0.0;   END_IF;
+
+rDerivative := (rError - rPrevError) / rDt_s;
+rPrevError  := rError;
+
+rUnsatOutput := (rKp * rError) + rIntegral + (rKd * rDerivative);
+IF rUnsatOutput &gt; 100.0 THEN
+    rVfdCommand_Pct := 100.0;
+ELSIF rUnsatOutput &lt; 0.0 THEN
+    rVfdCommand_Pct := 0.0;
+ELSE
+    rVfdCommand_Pct := rUnsatOutput;
+END_IF;
+
+bPumpRunEnable := (rVfdCommand_Pct &gt; 2.0);
+rAnalogOut_mA  := 4.0 + (rVfdCommand_Pct / 100.0) * 16.0;</xhtml:p>
+          </ST>
         </body>
       </pou>
     </pous>
   </types>
-  <instances><configurations/></instances>
+  <instances>
+    <configurations />
+  </instances>
 </project>
